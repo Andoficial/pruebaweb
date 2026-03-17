@@ -481,7 +481,7 @@ function updateInfoPanel(username) {
   if (!lastData) return;
   const p = lastData.jugadores.find(j => j.username === username);
   document.getElementById('info-user').textContent = p ? p.username : '—';
-  document.getElementById('info-zona').textContent = p ? (p.zona || 'FUERA DE ZONA') : '—';
+  document.getElementById('info-zona').textContent = p && p.enZona ? 'Área ' + p.zona : '—';
   document.getElementById('info-zona').className   = 'val' + (p && p.enZona ? ' alerta' : '');
   document.getElementById('info-x').textContent    = p ? p.mapX : '—';
   document.getElementById('info-y').textContent    = p ? p.mapY : '—';
@@ -511,7 +511,7 @@ function renderList(jugadores) {
       <div class="player-info">
         <div class="player-name">${p.username}</div>
         <div class="player-zona ${p.enZona ? 'activa' : ''}">
-          ${p.enZona ? '⚠ ' + p.zona : 'LIBRE'}
+          ${p.enZona ? 'Área ' + p.zona : '&nbsp;'}
         </div>
       </div>
     `;
@@ -553,12 +553,6 @@ async function fetchLocations() {
 
     renderList(data.jugadores);
     updateInfoPanel(selectedUser);
-
-    // detectar si observador_11 entró en zona
-    const obs = data.jugadores.find(p => p.username === TARGET_USER);
-    if (obs && obs.enZona) {
-      showToast('⚠ ' + TARGET_USER + ' EN ZONA ' + obs.zona);
-    }
 
   } catch(e) {
     lastUpdateEl.textContent = 'ERROR CONEXIÓN';
