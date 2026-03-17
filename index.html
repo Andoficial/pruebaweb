@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080c10;
+    --panel:     #0d1520;
+    --border:    #1a2e44;
+    --accent:    #00e5ff;
+    --accent2:   #ff3d6b;
+    --green:     #00ff88;
+    --text:      #c8dff0;
+    --textdim:   #4a7090;
+    --dot:       #00e5ff;
+    --dot-zona:  #ff3d6b;
+    --scan:      rgba(0,229,255,0.04);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+  }
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent2); }
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--textdim);
+  }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 1.4s infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+  .clock {
+    color: var(--accent);
+    font-size: 0.78rem;
+    letter-spacing: 2px;
+  }
+
+  /* ── LAYOUT ── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: 260px;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .aside-title {
+    padding: 14px 18px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 3px;
+    color: var(--textdim);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  /* buscador */
+  .search-wrap {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-wrap input {
+    width: 100%;
+    background: #0a1520;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    padding: 7px 10px;
+    outline: none;
+    border-radius: 2px;
+    transition: border .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--textdim); }
+
+  /* lista jugadores */
+  #player-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  #player-list::-webkit-scrollbar { width: 4px; }
+  #player-list::-webkit-scrollbar-track { background: transparent; }
+  #player-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .player-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background .15s;
+    border-left: 2px solid transparent;
+  }
+  .player-item:hover { background: rgba(0,229,255,.05); }
+  .player-item.active {
+    background: rgba(0,229,255,.08);
+    border-left-color: var(--accent);
+  }
+  .player-item.en-zona { border-left-color: var(--accent2); }
+  .player-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 6px var(--dot);
+    flex-shrink: 0;
+  }
+  .player-dot.zona { background: var(--dot-zona); box-shadow: 0 0 6px var(--dot-zona); }
+  .player-info { flex: 1; min-width: 0; }
+  .player-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+  .player-zona {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--textdim);
+    margin-top: 1px;
+  }
+  .player-zona.activa { color: var(--accent2); }
+
+  /* info panel */
+  .info-panel {
+    padding: 14px 16px;
+    border-top: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--textdim);
+    line-height: 2;
+  }
+  .info-panel .val { color: var(--accent); }
+  .info-panel .val.alerta { color: var(--accent2); }
+  .info-panel .label { color: var(--textdim); }
+
+  /* ── MAPA ── */
+  .map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #050810;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* efecto scanline */
+  .map-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      var(--scan) 0px,
+      var(--scan) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* borde esquinas estilo HUD */
+  .corner {
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: var(--accent);
+    border-style: solid;
+    z-index: 6;
+    opacity: .5;
+  }
+  .corner.tl { top:12px; left:12px;  border-width: 2px 0 0 2px; }
+  .corner.tr { top:12px; right:12px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom:12px; left:12px;  border-width: 0 0 2px 2px; }
+  .corner.br { bottom:12px; right:12px; border-width: 0 2px 2px 0; }
+
+  #map-container {
+    position: relative;
+    z-index: 4;
+    /* se ajusta dinámicamente con JS */
+  }
+
+  #map-img {
+    display: block;
+    image-rendering: auto;
+    border: 1px solid var(--border);
+  }
+
+  /* puntos de jugadores */
+  .marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    transition: left .8s cubic-bezier(.4,0,.2,1),
+                top  .8s cubic-bezier(.4,0,.2,1);
+  }
+  .marker-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--dot);
+    box-shadow: 0 0 0 2px rgba(0,229,255,.3), 0 0 12px var(--dot);
+    animation: markerPulse 2s infinite;
+  }
+  .marker-dot.zona {
+    background: var(--dot-zona);
+    box-shadow: 0 0 0 2px rgba(255,61,107,.3), 0 0 12px var(--dot-zona);
+  }
+  .marker-dot.target {
+    background: #fff;
+    box-shadow: 0 0 0 3px var(--accent), 0 0 20px var(--accent);
+    animation: targetPulse 1s infinite;
+  }
+  @keyframes markerPulse {
+    0%,100% { transform: scale(1); opacity:1; }
+    50%      { transform: scale(1.3); opacity:.8; }
+  }
+  @keyframes targetPulse {
+    0%,100% { transform: scale(1); }
+    50%      { transform: scale(1.5); }
+  }
+
+  .marker-label {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--accent);
+    white-space: nowrap;
+    background: rgba(8,12,16,.85);
+    padding: 1px 5px;
+    border: 1px solid var(--border);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .marker:hover .marker-label,
+  .marker.show-label .marker-label { opacity: 1; }
+
+  /* línea de ping scan */
+  .scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: .6;
+    animation: scanAnim 4s linear infinite;
+    z-index: 5;
+    pointer-events: none;
+  }
+  @keyframes scanAnim {
+    0%   { top: 0%; }
+    100% { top: 100%; }
+  }
+
+  /* toast notificación */
+  #toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    padding: 10px 18px;
+    letter-spacing: 1px;
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .3s, transform .3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* empty state */
+  .empty {
+    padding: 20px 16px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--textdim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">LIVE<span>MAP</span> &nbsp;/&nbsp; RP</div>
+  <div class="status-bar">
+    <div class="pulse"></div>
+    <span id="player-count">0 JUGADORES</span>
+    <span class="clock" id="clock">--:--:--</span>
+    <span id="last-update">SIN DATOS</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside>
+    <div class="aside-title">// UNIDADES ACTIVAS</div>
+    <div class="search-wrap">
+      <input type="text" id="search" placeholder="Buscar jugador...">
+    </div>
+    <div id="player-list"><div class="empty">Sin jugadores</div></div>
+    <div class="info-panel" id="info-panel">
+      <div><span class="label">USUARIO &nbsp;</span><span class="val" id="info-user">—</span></div>
+      <div><span class="label">ZONA &nbsp;&nbsp;&nbsp;</span><span class="val" id="info-zona">—</span></div>
+      <div><span class="label">MAP X &nbsp;&nbsp;</span><span class="val" id="info-x">—</span></div>
+      <div><span class="label">MAP Y &nbsp;&nbsp;</span><span class="val" id="info-y">—</span></div>
+    </div>
+  </aside>
+
+  <div class="map-wrap" id="map-wrap">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
+    <div class="scan-line"></div>
+    <div id="map-container">
+      <img id="map-img" src="mapa.png" alt="mapa">
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── CONFIGURACIÓN ────────────────────────────────────────────────
+// Cambia esto por tu endpoint de npoint.io
+// Instrucciones: ve a https://api.npoint.io, crea un endpoint con {}
+// y pega la URL GET aquí:
+const API_URL = "https://api.npoint.io/16c8e3be6b92761ad1b6";
+
+const REFRESH_MS = 5000;
+const TARGET_USER = "observador_11"; // usuario a destacar
+// ──────────────────────────────────────────────────────────────────
+
+const mapImg       = document.getElementById('map-img');
+const mapContainer = document.getElementById('map-container');
+const playerList   = document.getElementById('player-list');
+const searchInput  = document.getElementById('search');
+const clockEl      = document.getElementById('clock');
+const countEl      = document.getElementById('player-count');
+const lastUpdateEl = document.getElementById('last-update');
+const toast        = document.getElementById('toast');
+
+let lastData = null;
+let selectedUser = TARGET_USER;
+let markers = {};
+
+// ── Reloj ──
+function updateClock() {
+  const now = new Date();
+  clockEl.textContent = now.toLocaleTimeString('es-ES');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── Toast ──
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ── Tamaño del mapa (se calcula cuando carga la imagen) ──
+let mapW = 693, mapH = 534;
+mapImg.onload = () => {
+  mapW = mapImg.naturalWidth;
+  mapH = mapImg.naturalHeight;
+  mapImg.style.maxWidth  = '100%';
+  mapImg.style.maxHeight = '100%';
+};
+
+// ── Crear / actualizar marker ──
+function upsertMarker(player) {
+  let m = markers[player.username];
+  if (!m) {
+    m = document.createElement('div');
+    m.className = 'marker';
+    m.innerHTML = `
+      <div class="marker-dot"></div>
+      <div class="marker-label">${player.username}</div>
+    `;
+    m.addEventListener('mouseenter', () => selectPlayer(player.username));
+    mapContainer.appendChild(m);
+    markers[player.username] = m;
+  }
+
+  // Posición en % para que escale con la imagen
+  const rect = mapImg.getBoundingClientRect();
+  const cRect = mapContainer.getBoundingClientRect();
+  const scaleX = mapImg.offsetWidth  / mapW;
+  const scaleY = mapImg.offsetHeight / mapH;
+
+  m.style.left = (player.mapX * scaleX) + 'px';
+  m.style.top  = (player.mapY * scaleY) + 'px';
+
+  const dot = m.querySelector('.marker-dot');
+  dot.className = 'marker-dot' +
+    (player.enZona ? ' zona' : '') +
+    (player.username === selectedUser ? ' target' : '');
+
+  if (player.username === selectedUser) {
+    m.classList.add('show-label');
+  } else {
+    m.classList.remove('show-label');
+  }
+}
+
+// ── Seleccionar jugador ──
+function selectPlayer(username) {
+  selectedUser = username;
+  document.querySelectorAll('.player-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.user === username);
+  });
+  // actualizar dot target
+  Object.values(markers).forEach(m => {
+    const dot = m.querySelector('.marker-dot');
+    const isTarget = m._username === username;
+    dot.classList.toggle('target', isTarget);
+    m.classList.toggle('show-label', isTarget);
+  });
+  updateInfoPanel(username);
+}
+
+function updateInfoPanel(username) {
+  if (!lastData) return;
+  const p = lastData.jugadores.find(j => j.username === username);
+  document.getElementById('info-user').textContent = p ? p.username : '—';
+  document.getElementById('info-zona').textContent = p ? (p.zona || 'FUERA DE ZONA') : '—';
+  document.getElementById('info-zona').className   = 'val' + (p && p.enZona ? ' alerta' : '');
+  document.getElementById('info-x').textContent    = p ? p.mapX : '—';
+  document.getElementById('info-y').textContent    = p ? p.mapY : '—';
+}
+
+// ── Renderizar lista ──
+function renderList(jugadores) {
+  const query = searchInput.value.toLowerCase();
+  const filtered = jugadores.filter(p =>
+    p.username.toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    playerList.innerHTML = '<div class="empty">Sin resultados</div>';
+    return;
+  }
+
+  playerList.innerHTML = '';
+  filtered.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'player-item' + (p.enZona ? ' en-zona' : '') +
+                   (p.username === selectedUser ? ' active' : '');
+    el.dataset.user = p.username;
+    el._username = p.username;
+    el.innerHTML = `
+      <div class="player-dot ${p.enZona ? 'zona' : ''}"></div>
+      <div class="player-info">
+        <div class="player-name">${p.username}</div>
+        <div class="player-zona ${p.enZona ? 'activa' : ''}">
+          ${p.enZona ? '⚠ ' + p.zona : 'LIBRE'}
+        </div>
+      </div>
+    `;
+    el.addEventListener('click', () => selectPlayer(p.username));
+    playerList.appendChild(el);
+  });
+}
+
+// ── Limpiar markers que ya no están ──
+function cleanMarkers(jugadores) {
+  const names = new Set(jugadores.map(p => p.username));
+  Object.keys(markers).forEach(name => {
+    if (!names.has(name)) {
+      markers[name].remove();
+      delete markers[name];
+    }
+  });
+}
+
+// ── Fetch principal ──
+async function fetchLocations() {
+  try {
+    const res = await fetch(API_URL + '?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    if (!data.jugadores) return;
+    lastData = data;
+
+    countEl.textContent = data.jugadores.length + ' JUGADORES';
+    lastUpdateEl.textContent = 'ACT ' + new Date().toLocaleTimeString('es-ES');
+
+    cleanMarkers(data.jugadores);
+    data.jugadores.forEach(p => {
+      markers[p.username] = markers[p.username] || null;
+      upsertMarker(p);
+      if (markers[p.username]) markers[p.username]._username = p.username;
+    });
+
+    renderList(data.jugadores);
+    updateInfoPanel(selectedUser);
+
+    // detectar si observador_11 entró en zona
+    const obs = data.jugadores.find(p => p.username === TARGET_USER);
+    if (obs && obs.enZona) {
+      showToast('⚠ ' + TARGET_USER + ' EN ZONA ' + obs.zona);
+    }
+
+  } catch(e) {
+    lastUpdateEl.textContent = 'ERROR CONEXIÓN';
+    console.warn('Fetch error:', e);
+  }
+}
+
+searchInput.addEventListener('input', () => {
+  if (lastData) renderList(lastData.jugadores);
+});
+
+// Arrancar
+fetchLocations();
+setInterval(fetchLocations, REFRESH_MS);
+</script>
+</body>
+</html>
